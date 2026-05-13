@@ -20,7 +20,11 @@ export default async function handler(req, res) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0.7, maxOutputTokens: 1500 }
+          generationConfig: {
+            temperature: 0.7,
+            maxOutputTokens: 2000,
+            responseMimeType: 'application/json'
+          }
         })
       }
     );
@@ -28,8 +32,22 @@ export default async function handler(req, res) {
     const data = await response.json();
     if (!response.ok) return res.status(response.status).json({ error: data });
 
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    res.status(200).json({ text });
+    const raw = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+
+    // Meerdere fallbacks om JSON te extraheren
+    let parsed;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      const match = raw.match(/\{[\s\S]*\}/);
+      if (match) {
+        parsed = JSON.parse(match[0]);
+      } else {
+        throw new Error('Geen geldige JSON in response: ' + raw.slice(0, 300));
+      }
+    }
+
+    res.status(200).json({ result: parsed });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

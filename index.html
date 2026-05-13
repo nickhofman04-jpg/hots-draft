@@ -465,8 +465,7 @@ Alle tekst in het Nederlands.`;
     });
     const data=await res.json();
     if(data.error) throw new Error(JSON.stringify(data.error));
-    const raw=data.text||'';
-    showAnalysis(JSON.parse(raw.replace(/```json|```/g,'').trim()));
+    showAnalysis(data.result);
   }catch(e){
     document.getElementById('analysisPanel').innerHTML=`<div class="ap-placeholder">⚠️ Analyse mislukt.<br><small style="color:var(--muted)">${e.message}</small></div>`;
   }
