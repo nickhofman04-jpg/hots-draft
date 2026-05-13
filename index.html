@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HotS Draft Advisor</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Exo+2:wght@400;600;700;900&family=Rajdhani:wght@400;500;600&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#080b14;--bg2:#0e1220;--bg3:#141928;--bg4:#1a2135;
+  --mine:#00c853;--mine-dim:rgba(0,200,83,0.15);--mine-border:rgba(0,200,83,0.4);
+  --enemy:#ff3d00;--enemy-dim:rgba(255,61,0,0.15);--enemy-border:rgba(255,61,0,0.4);
+  --ban:#9e9e9e;--ban-dim:rgba(158,158,158,0.12);--ban-border:rgba(158,158,158,0.3);
+  --accent:#00b4ff;--gold:#ffc400;
+  --text:#e8eaf6;--muted:#546e7a;--border:rgba(255,255,255,0.08);
+  --ff:'Exo 2',sans-serif;--fb:'Rajdhani',sans-serif;
+}
+html,body{height:100%;overflow:hidden}
+body{background:var(--bg);color:var(--text);font-family:var(--fb);font-size:14px;display:flex;flex-direction:column}
+
+/* TOP BAR */
+.topbar{
+  display:flex;align-items:center;gap:0;
+  background:var(--bg2);border-bottom:1px solid var(--border);
+  padding:0;flex-shrink:0;height:56px;
+}
+.logo{
+  font-family:var(--ff);font-weight:900;font-size:20px;letter-spacing:2px;
+  color:var(--accent);text-transform:uppercase;padding:0 24px;
+  border-right:1px solid var(--border);white-space:nowrap;height:100%;
+  display:flex;align-items:center;gap:6px;
+}
+.logo span{color:#ff6b35}
+
+.mode-bar{display:flex;height:100%;flex:0 0 auto}
+.mode-btn{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:2px;padding:0 26px;border:none;background:transparent;
+  cursor:pointer;font-family:var(--ff);font-size:12px;font-weight:700;
+  letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);
+  border-right:1px solid var(--border);transition:all 0.15s;position:relative;
+}
+.mode-btn .mode-icon{font-size:20px}
+.mode-btn.active-mine{background:var(--mine-dim);color:var(--mine)}
+.mode-btn.active-mine::after{content:'';position:absolute;bottom:0;left:0;right:0;height:3px;background:var(--mine)}
+.mode-btn.active-enemy{background:var(--enemy-dim);color:var(--enemy)}
+.mode-btn.active-enemy::after{content:'';position:absolute;bottom:0;left:0;right:0;height:3px;background:var(--enemy)}
+.mode-btn.active-ban{background:var(--ban-dim);color:#bdbdbd}
+.mode-btn.active-ban::after{content:'';position:absolute;bottom:0;left:0;right:0;height:3px;background:var(--ban)}
+
+.map-bar{display:flex;align-items:center;gap:8px;padding:0 16px;border-right:1px solid var(--border);height:100%}
+.map-label{font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;white-space:nowrap}
+.map-select{
+  background:var(--bg3);border:1px solid var(--border);color:var(--text);
+  font-family:var(--fb);font-size:13px;padding:7px 12px;border-radius:6px;
+  outline:none;cursor:pointer;
+}
+.map-select:focus{border-color:var(--accent)}
+
+.search-bar{padding:0 14px;display:flex;align-items:center;gap:10px;height:100%;flex:1}
+.search-input{
+  background:var(--bg3);border:1px solid var(--border);color:var(--text);
+  font-family:var(--fb);font-size:14px;padding:7px 12px;border-radius:6px;
+  outline:none;width:180px;transition:border-color 0.15s;
+}
+.search-input:focus{border-color:var(--accent)}
+.search-input::placeholder{color:var(--muted)}
+.role-pills{display:flex;gap:5px;flex-wrap:wrap}
+.rpill{
+  padding:5px 11px;border-radius:20px;border:1px solid var(--border);
+  background:transparent;color:var(--muted);font-family:var(--fb);
+  font-size:11px;font-weight:600;cursor:pointer;transition:all 0.1s;
+  text-transform:uppercase;letter-spacing:0.5px;white-space:nowrap;
+}
+.rpill:hover{border-color:rgba(255,255,255,0.25);color:var(--text)}
+.rpill.on{background:rgba(0,180,255,0.15);border-color:rgba(0,180,255,0.4);color:var(--accent)}
+
+.analyze-wrap{padding:0 16px;flex-shrink:0}
+.analyze-btn{
+  padding:9px 20px;border-radius:8px;border:none;cursor:pointer;
+  background:linear-gradient(135deg,#0050ff,#00b4ff);
+  color:#fff;font-family:var(--ff);font-weight:700;font-size:12px;
+  letter-spacing:1.5px;text-transform:uppercase;transition:all 0.2s;
+  white-space:nowrap;
+}
+.analyze-btn:hover{transform:translateY(-1px);box-shadow:0 4px 20px rgba(0,180,255,0.4)}
+.analyze-btn:disabled{opacity:0.6;cursor:default;transform:none}
+
+/* MAIN */
+.main{display:flex;flex:1;overflow:hidden}
+
+.hero-section{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0}
+.hero-grid-scroll{flex:1;overflow-y:auto;padding:12px}
+.role-group{margin-bottom:14px}
+.role-group-header{
+  font-family:var(--ff);font-size:10px;font-weight:700;letter-spacing:3px;
+  text-transform:uppercase;color:var(--muted);padding:4px 6px 8px;
+  border-bottom:1px solid var(--border);margin-bottom:10px;
+  display:flex;align-items:center;gap:8px;
+}
+.hero-grid{display:flex;flex-wrap:wrap;gap:6px}
+
+.hcard{
+  width:72px;border-radius:8px;background:var(--bg3);
+  border:1.5px solid var(--border);cursor:pointer;
+  transition:transform 0.12s, border-color 0.12s, box-shadow 0.12s;
+  display:flex;flex-direction:column;align-items:center;
+  padding:7px 4px 6px;gap:3px;position:relative;user-select:none;
+}
+.hcard:hover{transform:scale(1.07);z-index:2;border-color:rgba(255,255,255,0.3)}
+.hcard.st-mine{background:var(--mine-dim);border-color:var(--mine);box-shadow:0 0 14px rgba(0,200,83,0.3)}
+.hcard.st-mine::after{content:'✓';position:absolute;top:3px;right:5px;font-size:12px;color:var(--mine);font-weight:900}
+.hcard.st-enemy{background:var(--enemy-dim);border-color:var(--enemy);box-shadow:0 0 14px rgba(255,61,0,0.3)}
+.hcard.st-enemy::after{content:'✕';position:absolute;top:3px;right:5px;font-size:12px;color:var(--enemy);font-weight:900}
+.hcard.st-ban{opacity:0.32;pointer-events:none;border-color:var(--ban-border)}
+.hcard.st-ban::after{content:'🚫';position:absolute;top:0;left:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;font-size:24px;background:rgba(0,0,0,0.65);border-radius:7px}
+.hcard.st-taken{opacity:0.38;pointer-events:none}
+.hicon{font-size:28px;line-height:1}
+.hname{font-family:var(--ff);font-size:9px;font-weight:600;text-align:center;line-height:1.2;word-break:break-word;color:var(--text)}
+.hrole{font-size:7px;font-weight:700;letter-spacing:0.5px;padding:1px 4px;border-radius:3px;text-transform:uppercase;margin-top:1px}
+.r-Warrior{background:rgba(255,107,53,0.25);color:#ff8c60}
+.r-Support{background:rgba(0,230,118,0.2);color:#69f0ae}
+.r-Assassin{background:rgba(255,23,68,0.2);color:#ff616f}
+.r-Mage{background:rgba(156,39,176,0.25);color:#ea80fc}
+.r-Specialist{background:rgba(255,215,0,0.2);color:#ffd740}
+
+/* SIDE */
+.side-panel{
+  width:300px;flex-shrink:0;background:var(--bg2);
+  border-left:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;
+}
+.draft-summary{flex-shrink:0;padding:12px;border-bottom:1px solid var(--border)}
+.team-row{display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;padding:9px;border-radius:8px}
+.team-row.mine-row{background:var(--mine-dim);border:1px solid var(--mine-border)}
+.team-row.enemy-row{background:var(--enemy-dim);border:1px solid var(--enemy-border)}
+.team-label{font-family:var(--ff);font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;flex-shrink:0;padding-top:3px}
+.mine-row .team-label{color:var(--mine)}
+.enemy-row .team-label{color:var(--enemy)}
+.hero-pills{display:flex;gap:4px;flex-wrap:wrap;flex:1}
+.hpill{
+  display:flex;align-items:center;gap:3px;padding:3px 8px;border-radius:12px;
+  font-size:10px;font-weight:600;font-family:var(--ff);cursor:pointer;transition:opacity 0.1s;
+}
+.hpill:hover{opacity:0.7}
+.hpill-mine{background:rgba(0,200,83,0.2);border:1px solid rgba(0,200,83,0.35);color:var(--mine)}
+.hpill-enemy{background:rgba(255,61,0,0.2);border:1px solid rgba(255,61,0,0.35);color:var(--enemy)}
+.slot-empty{width:30px;height:24px;border-radius:4px;border:1px dashed rgba(255,255,255,0.1);opacity:0.4}
+.bans-row{display:flex;align-items:flex-start;gap:8px;padding:7px 9px;background:var(--bg3);border-radius:8px;border:1px solid rgba(158,158,158,0.15)}
+.bans-label{font-family:var(--ff);font-size:10px;font-weight:700;letter-spacing:1.5px;color:#9e9e9e;text-transform:uppercase;flex-shrink:0;padding-top:3px}
+.bpill{
+  padding:3px 7px;border-radius:12px;font-size:10px;font-weight:600;
+  background:rgba(158,158,158,0.15);border:1px solid rgba(158,158,158,0.25);
+  color:#9e9e9e;display:flex;align-items:center;gap:2px;cursor:pointer;
+  font-family:var(--ff);transition:opacity 0.1s;
+}
+.bpill:hover{opacity:0.7}
+
+.analysis-panel{flex:1;overflow-y:auto;padding:12px}
+.ap-placeholder{text-align:center;color:var(--muted);padding:40px 20px;font-size:13px;line-height:1.7}
+.ap-icon{font-size:42px;margin-bottom:14px;opacity:0.4}
+.a-section{margin-bottom:16px}
+.a-head{font-family:var(--ff);font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;padding:5px 0;border-bottom:1px solid var(--border);margin-bottom:8px;display:flex;align-items:center;gap:5px}
+.a-text{font-size:12px;color:#90a4ae;line-height:1.6}
+.chip{display:inline-flex;align-items:center;gap:3px;padding:3px 9px;border-radius:4px;font-size:10px;font-weight:600;margin:2px;font-family:var(--ff)}
+.chip-g{background:rgba(0,200,83,0.12);color:var(--mine);border:1px solid rgba(0,200,83,0.2)}
+.chip-r{background:rgba(255,61,0,0.12);color:var(--enemy);border:1px solid rgba(255,61,0,0.2)}
+.chip-y{background:rgba(255,196,0,0.1);color:var(--gold);border:1px solid rgba(255,196,0,0.2)}
+.chip-b{background:rgba(0,180,255,0.1);color:var(--accent);border:1px solid rgba(0,180,255,0.2)}
+.chip-p{background:rgba(156,39,176,0.15);color:#ea80fc;border:1px solid rgba(156,39,176,0.25)}
+.rbar{margin:5px 0}
+.rbar-top{display:flex;justify-content:space-between;font-size:10px;margin-bottom:3px}
+.rbar-name{color:var(--muted)}
+.rtrack{height:5px;background:rgba(255,255,255,0.06);border-radius:3px;overflow:hidden}
+.rfill{height:100%;border-radius:3px;transition:width 0.8s ease}
+.dots{display:inline-flex;gap:4px}
+.dots span{width:6px;height:6px;background:var(--accent);border-radius:50%;animation:bounce 1s infinite}
+.dots span:nth-child(2){animation-delay:.2s}
+.dots span:nth-child(3){animation-delay:.4s}
+@keyframes bounce{0%,80%,100%{transform:scale(.6);opacity:.5}40%{transform:scale(1);opacity:1}}
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.1);border-radius:2px}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">HOTS <span>DRAFT</span></div>
+  <div class="mode-bar">
+    <button class="mode-btn active-mine" id="btn-mine" onclick="setMode('mine')">
+      <span class="mode-icon">🟢</span><span>Mijn Team</span>
+    </button>
+    <button class="mode-btn" id="btn-enemy" onclick="setMode('enemy')">
+      <span class="mode-icon">🔴</span><span>Enemy</span>
+    </button>
+    <button class="mode-btn" id="btn-ban" onclick="setMode('ban')">
+      <span class="mode-icon">⛔</span><span>Ban</span>
+    </button>
+  </div>
+  <div class="map-bar">
+    <span class="map-label">Map:</span>
+    <select class="map-select" id="mapSelect">
+      <option value="">— Kies map —</option>
+      <option value="Sky Temple">🏛️ Sky Temple</option>
+      <option value="Garden of Terror">🌿 Garden of Terror</option>
+      <option value="Cursed Hollow">🍂 Cursed Hollow</option>
+      <option value="Infernal Shrines">💠 Infernal Shrines</option>
+      <option value="Dragon Shire">🐉 Dragon Shire</option>
+      <option value="Tomb of the Spider Queen">🕸️ Tomb of the Spider Queen</option>
+      <option value="Battlefield of Eternity">⚔️ Battlefield of Eternity</option>
+      <option value="Volskaya Foundry">🤖 Volskaya Foundry</option>
+      <option value="Towers of Doom">🗼 Towers of Doom</option>
+      <option value="Warhead Junction">☢️ Warhead Junction</option>
+      <option value="Hanamura Temple">🌸 Hanamura Temple</option>
+      <option value="Braxis Holdout">🧟 Braxis Holdout</option>
+    </select>
+  </div>
+  <div class="search-bar">
+    <input class="search-input" id="searchInput" placeholder="Zoek hero..." oninput="onSearch(this.value)">
+    <div class="role-pills" id="rolePills"></div>
+  </div>
+  <div class="analyze-wrap">
+    <button class="analyze-btn" id="analyzeBtn" onclick="doAnalyze()">⚡ Analyseer</button>
+  </div>
+</div>
+
+<div class="main">
+  <div class="hero-section">
+    <div class="hero-grid-scroll" id="heroGridScroll"></div>
+  </div>
+  <div class="side-panel">
+    <div class="draft-summary">
+      <div class="team-row mine-row">
+        <span class="team-label">Team</span>
+        <div class="hero-pills" id="myPills"></div>
+      </div>
+      <div class="team-row enemy-row" style="margin-bottom:8px">
+        <span class="team-label">Enemy</span>
+        <div class="hero-pills" id="enPills"></div>
+      </div>
+      <div class="bans-row">
+        <span class="bans-label">Bans</span>
+        <div style="display:flex;gap:4px;flex-wrap:wrap" id="banPills"></div>
+      </div>
+    </div>
+    <div class="analysis-panel" id="analysisPanel">
+      <div class="ap-placeholder">
+        <div class="ap-icon">⚔️</div>
+        Selecteer een modus bovenaan (Mijn Team / Enemy / Ban),<br>
+        klik dan op heroes in het grid om ze toe te voegen.<br><br>
+        Klik nogmaals op een hero om hem te verwijderen.<br><br>
+        Kies een map en klik <strong>Analyseer</strong> voor AI advies.
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const ALL_HEROES = [
+  // WARRIORS
+  {id:'johanna',name:'Johanna',role:'Warrior',icon:'🛡️',wc:4,mob:2,cc:8,sus:7,bur:2,mac:3,maps:['Cursed Hollow','Battlefield of Eternity'],ctr:['Valeera','Illidan'],syn:['Mephisto','Jaina','ETC']},
+  {id:'muradin',name:'Muradin',role:'Warrior',icon:'⚒️',wc:3,mob:5,cc:7,sus:6,bur:4,mac:3,maps:['Dragon Shire','Infernal Shrines'],ctr:['Valeera','Zeratul'],syn:['Tassadar','Jaina','Greymane']},
+  {id:'arthas',name:'Arthas',role:'Warrior',icon:'🧊',wc:6,mob:2,cc:9,sus:7,bur:3,mac:5,maps:['Cursed Hollow','Tomb of the Spider Queen'],ctr:['Illidan','Thrall'],syn:['Mephisto','Jaina','Kerrigan']},
+  {id:'diablo',name:'Diablo',role:'Warrior',icon:'😈',wc:3,mob:5,cc:8,sus:7,bur:5,mac:3,maps:['Sky Temple','Infernal Shrines'],ctr:['Valeera','Zeratul'],syn:['Jaina','Mephisto','ETC']},
+  {id:'stitches',name:'Stitches',role:'Warrior',icon:'🪝',wc:4,mob:1,cc:7,sus:6,bur:4,mac:2,maps:['Garden of Terror','Cursed Hollow'],ctr:['Illidan','Falstad'],syn:['Jaina','Chromie','ETC']},
+  {id:'etc',name:'E.T.C.',role:'Warrior',icon:'🎸',wc:4,mob:6,cc:9,sus:5,bur:2,mac:3,maps:['Infernal Shrines','Sky Temple'],ctr:['Valeera','Zeratul'],syn:['Jaina','Tassadar','Greymane']},
+  {id:'thrall',name:'Thrall',role:'Warrior',icon:'⚡',wc:7,mob:5,cc:5,sus:7,bur:5,mac:5,maps:['Dragon Shire','Sky Temple'],ctr:['Valeera','Cassia'],syn:['ETC','Rehgar','Tassadar']},
+  {id:'imperius',name:'Imperius',role:'Warrior',icon:'🌟',wc:4,mob:6,cc:6,sus:6,bur:7,mac:3,maps:['Infernal Shrines','Battlefield of Eternity'],ctr:['Valeera','Zeratul'],syn:['Uther','Anduin','Jaina']},
+  {id:'garrosh',name:'Garrosh',role:'Warrior',icon:'🪓',wc:3,mob:3,cc:7,sus:7,bur:4,mac:3,maps:['Cursed Hollow','Infernal Shrines'],ctr:['Illidan','Valeera'],syn:['Jaina','Mephisto','ETC']},
+  {id:'blaze',name:'Blaze',role:'Warrior',icon:'🔥',wc:4,mob:3,cc:7,sus:7,bur:3,mac:3,maps:['Infernal Shrines','Sky Temple'],ctr:['Zeratul','Valeera'],syn:['Jaina','ETC','Johanna']},
+  {id:'mei',name:'Mei',role:'Warrior',icon:'🧊',wc:4,mob:3,cc:9,sus:6,bur:3,mac:2,maps:['Infernal Shrines','Cursed Hollow'],ctr:['Illidan','Tracer'],syn:['Jaina','Mephisto','ETC']},
+  {id:'deathwing',name:'Deathwing',role:'Warrior',icon:'🐲',wc:7,mob:4,cc:5,sus:8,bur:8,mac:5,maps:['Battlefield of Eternity','Sky Temple'],ctr:['Muradin','Johanna'],syn:['Uther','Ana']},
+  {id:'chogall',name:"Cho'gall",role:'Warrior',icon:'👹',wc:5,mob:3,cc:7,sus:7,bur:6,mac:4,maps:['Infernal Shrines','Cursed Hollow'],ctr:['Zeratul','Valeera'],syn:['Jaina','Mephisto']},
+  {id:'malthael',name:'Malthael',role:'Warrior',icon:'💀',wc:5,mob:4,cc:4,sus:6,bur:8,mac:4,maps:['Sky Temple','Battlefield of Eternity'],ctr:['Johanna','Arthas'],syn:['ETC','Diablo','Jaina']},
+  {id:'ragnaros',name:'Ragnaros',role:'Warrior',icon:'🌋',wc:7,mob:2,cc:5,sus:6,bur:8,mac:7,maps:['Garden of Terror','Towers of Doom'],ctr:['Valeera','Zeratul'],syn:['ETC','Johanna','Arthas']},
+  {id:'sonya',name:'Sonya',role:'Warrior',icon:'⚔️',wc:6,mob:5,cc:4,sus:8,bur:5,mac:5,maps:['Dragon Shire','Battlefield of Eternity'],ctr:['Valeera','Zeratul'],syn:['ETC','Rehgar','Thrall']},
+  {id:'leoric',name:'Leoric',role:'Warrior',icon:'👑',wc:5,mob:3,cc:5,sus:8,bur:5,mac:6,maps:['Tomb of the Spider Queen','Cursed Hollow'],ctr:['Illidan','Tracer'],syn:['Johanna','ETC','Jaina']},
+  {id:'malganis',name:"Mal'Ganis",role:'Warrior',icon:'🦇',wc:4,mob:5,cc:8,sus:8,bur:4,mac:3,maps:['Cursed Hollow','Infernal Shrines'],ctr:['Illidan','Valeera'],syn:['Jaina','Mephisto','ETC']},
+  {id:'chen',name:'Chen',role:'Warrior',icon:'🐼',wc:5,mob:4,cc:5,sus:8,bur:4,mac:5,maps:['Garden of Terror','Dragon Shire'],ctr:['Valeera'],syn:['ETC','Rehgar','Jaina']},
+  {id:'anubarak',name:"Anub'arak",role:'Warrior',icon:'🦂',wc:4,mob:5,cc:7,sus:6,bur:4,mac:3,maps:['Infernal Shrines','Cursed Hollow'],ctr:['Valeera','Zeratul'],syn:['Jaina','ETC','Mephisto']},
+  {id:'varian',name:'Varian',role:'Warrior',icon:'🗡️',wc:4,mob:4,cc:6,sus:7,bur:5,mac:4,maps:['Dragon Shire','Sky Temple'],ctr:['Valeera'],syn:['ETC','Jaina','Tassadar']},
+  {id:'yrel',name:'Yrel',role:'Warrior',icon:'🌠',wc:4,mob:4,cc:6,sus:7,bur:6,mac:3,maps:['Infernal Shrines','Battlefield of Eternity'],ctr:['Illidan','Valeera'],syn:['Uther','ETC','Jaina']},
+  // ASSASSINS
+  {id:'valeera',name:'Valeera',role:'Assassin',icon:'🗡️',wc:2,mob:8,cc:7,sus:3,bur:7,mac:2,maps:['Tomb of the Spider Queen'],ctr:['Johanna','Arthas','ETC'],syn:['Zeratul','Greymane','Illidan']},
+  {id:'zeratul',name:'Zeratul',role:'Assassin',icon:'👁️',wc:4,mob:9,cc:5,sus:3,bur:8,mac:4,maps:['Sky Temple','Dragon Shire'],ctr:['Johanna','Muradin'],syn:['Tassadar','Jaina','Chromie']},
+  {id:'illidan',name:'Illidan',role:'Assassin',icon:'🦋',wc:3,mob:9,cc:2,sus:6,bur:5,mac:3,maps:['Garden of Terror','Dragon Shire'],ctr:['Johanna','Arthas','Jaina'],syn:['Tassadar','Tyrande','ETC']},
+  {id:'greymane',name:'Greymane',role:'Assassin',icon:'🐺',wc:5,mob:7,cc:2,sus:4,bur:8,mac:4,maps:['Battlefield of Eternity','Sky Temple'],ctr:['Arthas','Johanna'],syn:['ETC','Uther','Diablo']},
+  {id:'cassia',name:'Cassia',role:'Assassin',icon:'⚡',wc:6,mob:7,cc:4,sus:4,bur:7,mac:5,maps:['Dragon Shire','Garden of Terror'],ctr:['Diablo','Thrall'],syn:['ETC','Johanna','Tassadar']},
+  {id:'falstad',name:'Falstad',role:'Assassin',icon:'🦅',wc:5,mob:9,cc:5,sus:3,bur:6,mac:7,maps:['Battlefield of Eternity','Sky Temple'],ctr:['Johanna','Arthas'],syn:['ETC','Uther','Jaina']},
+  {id:'raynor',name:'Raynor',role:'Assassin',icon:'🔫',wc:5,mob:3,cc:2,sus:5,bur:6,mac:4,maps:['Battlefield of Eternity'],ctr:['Valeera','Zeratul'],syn:['Tassadar','Uther','Johanna']},
+  {id:'genji',name:'Genji',role:'Assassin',icon:'🤖',wc:3,mob:9,cc:2,sus:2,bur:7,mac:2,maps:['Dragon Shire','Infernal Shrines'],ctr:['Johanna','ETC'],syn:['Lucio','Ana','ETC']},
+  {id:'tracer',name:'Tracer',role:'Assassin',icon:'💨',wc:3,mob:10,cc:2,sus:3,bur:7,mac:3,maps:['Battlefield of Eternity','Garden of Terror'],ctr:['Johanna','Arthas'],syn:['ETC','Uther','Diablo']},
+  {id:'kerrigan',name:'Kerrigan',role:'Assassin',icon:'👸',wc:5,mob:7,cc:7,sus:5,bur:7,mac:4,maps:['Infernal Shrines','Sky Temple'],ctr:['Johanna','Arthas'],syn:['ETC','Jaina','Zeratul']},
+  {id:'zuljin',name:"Zul'jin",role:'Assassin',icon:'🪃',wc:6,mob:3,cc:3,sus:5,bur:8,mac:5,maps:['Battlefield of Eternity','Sky Temple'],ctr:['Valeera','Zeratul'],syn:['Uther','Johanna','ETC']},
+  {id:'hanzo',name:'Hanzo',role:'Assassin',icon:'🏹',wc:5,mob:4,cc:4,sus:2,bur:9,mac:3,maps:['Cursed Hollow','Sky Temple'],ctr:['Valeera','Zeratul'],syn:['ETC','Johanna','Arthas']},
+  {id:'fenix',name:'Fenix',role:'Assassin',icon:'🛸',wc:7,mob:4,cc:2,sus:5,bur:7,mac:6,maps:['Sky Temple','Battlefield of Eternity'],ctr:['Valeera','Zeratul'],syn:['ETC','Johanna','Tassadar']},
+  {id:'alarak',name:'Alarak',role:'Assassin',icon:'🔱',wc:4,mob:5,cc:5,sus:4,bur:8,mac:3,maps:['Infernal Shrines','Sky Temple'],ctr:['Valeera','Zeratul'],syn:['ETC','Diablo','Jaina']},
+  {id:'nova',name:'Nova',role:'Assassin',icon:'🔭',wc:3,mob:4,cc:3,sus:2,bur:9,mac:2,maps:['Towers of Doom','Cursed Hollow'],ctr:['Johanna','Arthas'],syn:['ETC','Diablo']},
+  {id:'samuro',name:'Samuro',role:'Assassin',icon:'🌪️',wc:4,mob:8,cc:2,sus:5,bur:7,mac:5,maps:['Garden of Terror','Dragon Shire'],ctr:['Zeratul','Johanna'],syn:['Illidan','ETC','Jaina']},
+  {id:'sylvanas',name:'Sylvanas',role:'Assassin',icon:'🏹',wc:8,mob:5,cc:5,sus:3,bur:6,mac:9,maps:['Tomb of the Spider Queen','Towers of Doom'],ctr:['Johanna','Arthas'],syn:['ETC','Jaina','Azmodan']},
+  {id:'lunara',name:'Lunara',role:'Assassin',icon:'🌿',wc:6,mob:6,cc:3,sus:2,bur:6,mac:4,maps:['Garden of Terror','Cursed Hollow'],ctr:['Valeera','Zeratul'],syn:['ETC','Johanna','Diablo']},
+  {id:'orphea',name:'Orphea',role:'Assassin',icon:'🌑',wc:5,mob:5,cc:4,sus:4,bur:8,mac:3,maps:['Infernal Shrines','Cursed Hollow'],ctr:['Zeratul','Valeera'],syn:['ETC','Johanna','Arthas']},
+  {id:'dva',name:'D.Va',role:'Assassin',icon:'🎮',wc:4,mob:7,cc:4,sus:6,bur:5,mac:3,maps:['Dragon Shire','Garden of Terror'],ctr:['Zeratul'],syn:['ETC','Jaina','Uther']},
+  {id:'tychus',name:'Tychus',role:'Assassin',icon:'🔩',wc:5,mob:3,cc:2,sus:4,bur:7,mac:5,maps:['Battlefield of Eternity','Sky Temple'],ctr:['Valeera','Zeratul'],syn:['Tassadar','Uther','ETC']},
+  {id:'alexstrasza',name:'Alexstrasza',role:'Support',icon:'🐉',wc:3,mob:4,cc:4,sus:9,bur:3,mac:3,maps:['Battlefield of Eternity','Dragon Shire'],ctr:['Valeera'],syn:['Johanna','ETC','Greymane']},
+  // MAGES
+  {id:'jaina',name:'Jaina',role:'Mage',icon:'❄️',wc:8,mob:2,cc:7,sus:2,bur:9,mac:5,maps:['Infernal Shrines','Sky Temple'],ctr:['Valeera','Zeratul','Illidan'],syn:['ETC','Johanna','Diablo']},
+  {id:'chromie',name:'Chromie',role:'Mage',icon:'⏰',wc:5,mob:2,cc:4,sus:1,bur:9,mac:3,maps:['Cursed Hollow','Sky Temple'],ctr:['Valeera','Zeratul','Illidan'],syn:['Johanna','Diablo','Arthas']},
+  {id:'mephisto',name:'Mephisto',role:'Mage',icon:'💜',wc:7,mob:3,cc:5,sus:3,bur:8,mac:4,maps:['Infernal Shrines','Cursed Hollow'],ctr:['Zeratul','Valeera'],syn:['Johanna','Arthas','Uther']},
+  {id:'kaelthas',name:"Kael'thas",role:'Mage',icon:'☀️',wc:8,mob:2,cc:5,sus:2,bur:9,mac:6,maps:['Tomb of the Spider Queen','Infernal Shrines'],ctr:['Valeera','Illidan'],syn:['Johanna','Muradin','ETC']},
+  {id:'liming',name:'Li-Ming',role:'Mage',icon:'✨',wc:5,mob:5,cc:3,sus:2,bur:9,mac:3,maps:['Sky Temple','Battlefield of Eternity'],ctr:['Johanna','Valeera'],syn:['ETC','Diablo','Tassadar']},
+  {id:'guldan',name:"Gul'dan",role:'Mage',icon:'💚',wc:7,mob:2,cc:4,sus:5,bur:8,mac:5,maps:['Infernal Shrines','Sky Temple'],ctr:['Valeera','Zeratul'],syn:['ETC','Johanna','Diablo']},
+  {id:'nazeebo',name:'Nazeebo',role:'Mage',icon:'🧪',wc:8,mob:2,cc:5,sus:4,bur:7,mac:8,maps:['Tomb of the Spider Queen','Garden of Terror'],ctr:['Valeera','Zeratul'],syn:['Johanna','ETC','Arthas']},
+  {id:'kelthuzad',name:"Kel'Thuzad",role:'Mage',icon:'💎',wc:6,mob:2,cc:7,sus:2,bur:9,mac:4,maps:['Cursed Hollow','Infernal Shrines'],ctr:['Valeera','Illidan'],syn:['ETC','Johanna','Diablo']},
+  {id:'azmodan',name:'Azmodan',role:'Mage',icon:'👿',wc:9,mob:1,cc:3,sus:4,bur:6,mac:9,maps:['Tomb of the Spider Queen','Cursed Hollow'],ctr:['Valeera','Zeratul'],syn:['Johanna','Arthas','ETC']},
+  {id:'gall',name:'Gall',role:'Mage',icon:'💥',wc:6,mob:3,cc:5,sus:6,bur:8,mac:5,maps:['Infernal Shrines','Cursed Hollow'],ctr:['Zeratul'],syn:['Johanna','ETC']},
+  // SUPPORTS
+  {id:'uther',name:'Uther',role:'Support',icon:'🙏',wc:2,mob:2,cc:7,sus:8,bur:2,mac:2,maps:['Cursed Hollow','Infernal Shrines'],ctr:['Valeera','Zeratul'],syn:['Johanna','ETC','Jaina']},
+  {id:'ltmorales',name:'Lt. Morales',role:'Support',icon:'💉',wc:1,mob:3,cc:2,sus:10,bur:1,mac:2,maps:['Battlefield of Eternity'],ctr:['Valeera','Zeratul','Illidan'],syn:['Raynor','Greymane','Falstad']},
+  {id:'rehgar',name:'Rehgar',role:'Support',icon:'🥁',wc:4,mob:6,cc:5,sus:7,bur:3,mac:4,maps:['Garden of Terror','Dragon Shire'],ctr:['Valeera'],syn:['Illidan','Thrall','ETC']},
+  {id:'tassadar',name:'Tassadar',role:'Support',icon:'🔮',wc:4,mob:3,cc:4,sus:6,bur:3,mac:4,maps:['Sky Temple','Dragon Shire'],ctr:['Valeera'],syn:['Zeratul','Illidan','Li-Ming']},
+  {id:'brightwing',name:'Brightwing',role:'Support',icon:'🦜',wc:4,mob:8,cc:6,sus:8,bur:2,mac:5,maps:['Garden of Terror','Dragon Shire','Battlefield of Eternity'],ctr:['Valeera'],syn:['Zeratul','Muradin','Illidan']},
+  {id:'ana',name:'Ana',role:'Support',icon:'🎯',wc:2,mob:2,cc:6,sus:9,bur:2,mac:2,maps:['Battlefield of Eternity','Infernal Shrines'],ctr:['Valeera','Zeratul'],syn:['Genji','ETC','Johanna']},
+  {id:'anduin',name:'Anduin',role:'Support',icon:'✝️',wc:3,mob:2,cc:5,sus:8,bur:2,mac:3,maps:['Infernal Shrines','Cursed Hollow'],ctr:['Valeera'],syn:['Johanna','Imperius','ETC']},
+  {id:'lucio',name:'Lúcio',role:'Support',icon:'🎵',wc:2,mob:9,cc:6,sus:7,bur:2,mac:3,maps:['Garden of Terror','Dragon Shire'],ctr:['Valeera'],syn:['Genji','ETC','Diablo']},
+  {id:'tyrande',name:'Tyrande',role:'Support',icon:'🌙',wc:4,mob:4,cc:6,sus:5,bur:4,mac:3,maps:['Dragon Shire','Cursed Hollow'],ctr:['Valeera'],syn:['Illidan','Zeratul','Greymane']},
+  {id:'whitemane',name:'Whitemane',role:'Support',icon:'⚗️',wc:3,mob:2,cc:4,sus:8,bur:3,mac:2,maps:['Sky Temple','Battlefield of Eternity'],ctr:['Valeera'],syn:['Johanna','ETC','Diablo']},
+  {id:'malfurion',name:'Malfurion',role:'Support',icon:'🍃',wc:3,mob:3,cc:6,sus:8,bur:2,mac:3,maps:['Cursed Hollow','Garden of Terror'],ctr:['Valeera'],syn:['Illidan','Zeratul','Greymane']},
+  {id:'deckard',name:'Deckard Cain',role:'Support',icon:'📖',wc:3,mob:2,cc:6,sus:8,bur:2,mac:2,maps:['Infernal Shrines','Cursed Hollow'],ctr:['Valeera','Zeratul'],syn:['Johanna','ETC','Diablo']},
+  {id:'kharazim',name:'Kharazim',role:'Support',icon:'✊',wc:3,mob:7,cc:3,sus:7,bur:4,mac:3,maps:['Dragon Shire','Sky Temple'],ctr:['Valeera'],syn:['Illidan','Greymane','Tracer']},
+  {id:'auriel',name:'Auriel',role:'Support',icon:'💫',wc:2,mob:4,cc:5,sus:9,bur:2,mac:2,maps:['Battlefield of Eternity','Infernal Shrines'],ctr:['Valeera'],syn:['Greymane','Li-Ming','Kael']},
+  {id:'lili',name:'Li Li',role:'Support',icon:'☯️',wc:2,mob:4,cc:3,sus:8,bur:1,mac:2,maps:['Garden of Terror','Dragon Shire'],ctr:['Valeera'],syn:['Illidan','Greymane','Thrall']},
+  {id:'stukov',name:'Stukov',role:'Support',icon:'🦾',wc:3,mob:2,cc:7,sus:8,bur:2,mac:3,maps:['Cursed Hollow','Infernal Shrines'],ctr:['Valeera'],syn:['ETC','Johanna','Diablo']},
+  // SPECIALISTS
+  {id:'zagara',name:'Zagara',role:'Specialist',icon:'🕷️',wc:10,mob:4,cc:3,sus:2,bur:4,mac:10,maps:['Tomb of the Spider Queen','Garden of Terror'],ctr:['Valeera'],syn:['ETC','Johanna','Arthas']},
+  {id:'abathur',name:'Abathur',role:'Specialist',icon:'🧬',wc:3,mob:1,cc:2,sus:3,bur:4,mac:10,maps:['Garden of Terror','Battlefield of Eternity'],ctr:['Valeera'],syn:['Greymane','Raynor','Muradin']},
+  {id:'medivh',name:'Medivh',role:'Specialist',icon:'🎩',wc:3,mob:5,cc:4,sus:5,bur:3,mac:4,maps:['Sky Temple','Dragon Shire'],ctr:['Valeera'],syn:['Illidan','Jaina','Greymane']},
+  {id:'probius',name:'Probius',role:'Specialist',icon:'🔵',wc:8,mob:2,cc:5,sus:1,bur:7,mac:7,maps:['Infernal Shrines','Sky Temple'],ctr:['Valeera','Zeratul'],syn:['Johanna','Arthas']},
+  {id:'murky',name:'Murky',role:'Specialist',icon:'🐟',wc:7,mob:3,cc:3,sus:3,bur:3,mac:8,maps:['Towers of Doom','Braxis Holdout'],ctr:['Zeratul'],syn:['Abathur','ETC']},
+  {id:'hammer',name:'Sgt. Hammer',role:'Specialist',icon:'💣',wc:7,mob:2,cc:3,sus:3,bur:8,mac:7,maps:['Towers of Doom','Warhead Junction'],ctr:['Valeera','Illidan'],syn:['ETC','Johanna','Diablo']},
+  {id:'xul',name:'Xul',role:'Specialist',icon:'💀',wc:9,mob:3,cc:6,sus:4,bur:5,mac:8,maps:['Tomb of the Spider Queen','Cursed Hollow'],ctr:['Valeera'],syn:['ETC','Jaina','Mephisto']},
+  {id:'losVikings',name:'Lost Vikings',role:'Specialist',icon:'⛵',wc:3,mob:2,cc:1,sus:2,bur:1,mac:10,maps:['Garden of Terror','Dragon Shire'],ctr:['Valeera'],syn:['Abathur']},
+  {id:'gazlowe',name:'Gazlowe',role:'Specialist',icon:'🔧',wc:7,mob:2,cc:5,sus:5,bur:5,mac:8,maps:['Towers of Doom','Warhead Junction'],ctr:['Zeratul','Valeera'],syn:['ETC','Johanna']},
+];
+
+const ROLES = ['Warrior','Assassin','Mage','Support','Specialist'];
+let mode='mine', myTeam=[], enemyTeam=[], bans=[], roleFilter='all', searchQ='', loading=false;
+
+function setMode(m){
+  mode=m;
+  ['mine','enemy','ban'].forEach(x=>{
+    const b=document.getElementById('btn-'+x);
+    b.className='mode-btn';
+    if(x===m) b.className='mode-btn active-'+x;
+  });
+  renderGrid();
+}
+
+function onSearch(v){searchQ=v.toLowerCase();renderGrid();}
+
+function buildRolePills(){
+  document.getElementById('rolePills').innerHTML=['all',...ROLES].map(r=>
+    `<button class="rpill ${roleFilter===r?'on':''}" onclick="setRole('${r}')">${r==='all'?'Alle':r}</button>`
+  ).join('');
+}
+
+function setRole(r){roleFilter=r;buildRolePills();renderGrid();}
+
+function getState(h){
+  if(bans.includes(h.id)) return 'ban';
+  if(myTeam.includes(h.id)) return 'mine';
+  if(enemyTeam.includes(h.id)) return 'enemy';
+  return 'none';
+}
+
+function clickHero(id){
+  const h=ALL_HEROES.find(x=>x.id===id);
+  const st=getState(h);
+  if(st==='mine'){myTeam=myTeam.filter(x=>x!==id);renderAll();return;}
+  if(st==='enemy'){enemyTeam=enemyTeam.filter(x=>x!==id);renderAll();return;}
+  if(st==='ban'){bans=bans.filter(x=>x!==id);renderAll();return;}
+  if(mode==='mine'&&myTeam.length<5) myTeam.push(id);
+  else if(mode==='enemy'&&enemyTeam.length<5) enemyTeam.push(id);
+  else if(mode==='ban'&&bans.length<6) bans.push(id);
+  renderAll();
+}
+
+function renderGrid(){
+  const scroll=document.getElementById('heroGridScroll');
+  let heroes=ALL_HEROES;
+  if(roleFilter!=='all') heroes=heroes.filter(h=>h.role===roleFilter);
+  if(searchQ) heroes=heroes.filter(h=>h.name.toLowerCase().includes(searchQ));
+  const groups=roleFilter==='all'?ROLES:[roleFilter];
+  scroll.innerHTML=groups.map(role=>{
+    const rh=heroes.filter(h=>h.role===role);
+    if(!rh.length) return '';
+    return `<div class="role-group">
+      <div class="role-group-header"><span class="hrole r-${role}">${role}</span> — ${rh.length} heroes</div>
+      <div class="hero-grid">${rh.map(h=>{
+        const st=getState(h);
+        let cls='hcard';
+        if(st==='mine') cls+=' st-mine';
+        else if(st==='enemy') cls+=' st-enemy';
+        else if(st==='ban') cls+=' st-ban';
+        else if((mode==='mine'&&myTeam.length>=5)||(mode==='enemy'&&enemyTeam.length>=5)||(mode==='ban'&&bans.length>=6)) cls+=' st-taken';
+        return `<div class="${cls}" onclick="clickHero('${h.id}')">
+          <span class="hicon">${h.icon}</span>
+          <span class="hname">${h.name}</span>
+          <span class="hrole r-${h.role}">${h.role.slice(0,3)}</span>
+        </div>`;
+      }).join('')}</div>
+    </div>`;
+  }).join('');
+}
+
+function renderSummary(){
+  const empty=n=>Array.from({length:n},()=>`<div class="slot-empty"></div>`).join('');
+  document.getElementById('myPills').innerHTML=myTeam.map(id=>{
+    const h=ALL_HEROES.find(x=>x.id===id);
+    return `<span class="hpill hpill-mine" onclick="removePick('${id}','mine')" title="Klik om te verwijderen">${h.icon} ${h.name}</span>`;
+  }).join('')+empty(5-myTeam.length);
+  document.getElementById('enPills').innerHTML=enemyTeam.map(id=>{
+    const h=ALL_HEROES.find(x=>x.id===id);
+    return `<span class="hpill hpill-enemy" onclick="removePick('${id}','enemy')" title="Klik om te verwijderen">${h.icon} ${h.name}</span>`;
+  }).join('')+empty(5-enemyTeam.length);
+  document.getElementById('banPills').innerHTML=bans.map(id=>{
+    const h=ALL_HEROES.find(x=>x.id===id);
+    return `<span class="bpill" onclick="removePick('${id}','ban')">🚫 ${h.name}</span>`;
+  }).join('')+empty(6-bans.length);
+}
+
+function removePick(id,type){
+  if(type==='mine') myTeam=myTeam.filter(x=>x!==id);
+  else if(type==='enemy') enemyTeam=enemyTeam.filter(x=>x!==id);
+  else bans=bans.filter(x=>x!==id);
+  renderAll();
+}
+
+function renderAll(){renderGrid();renderSummary();}
+
+async function doAnalyze(){
+  if(loading) return;
+  loading=true;
+  const btn=document.getElementById('analyzeBtn');
+  btn.disabled=true;
+  btn.innerHTML='<span class="dots"><span></span><span></span><span></span></span>';
+  const mapName=document.getElementById('mapSelect').value||'Onbekend';
+  const mh=myTeam.map(id=>ALL_HEROES.find(h=>h.id===id));
+  const eh=enemyTeam.map(id=>ALL_HEROES.find(h=>h.id===id));
+  const bh=bans.map(id=>ALL_HEROES.find(h=>h.id===id));
+  const hd=h=>`${h.name}(${h.role},CC:${h.cc},WC:${h.wc},Burst:${h.bur},Mob:${h.mob},Sus:${h.sus},Syn:[${h.syn}],Ctr:[${h.ctr}],Maps:[${h.maps}])`;
+  const prompt=`Je bent een Heroes of the Storm draft expert. Analyseer:
+Map: ${mapName}
+Bans: ${bh.map(h=>h.name).join(', ')||'geen'}
+Mijn Team: ${mh.length?mh.map(hd).join('\n'):'leeg'}
+Enemy Team: ${eh.length?eh.map(hd).join('\n'):'leeg'}
+Antwoord ALLEEN met pure JSON, geen markdown:
+{"teamStrengths":{"teamfight":0,"waveclear":0,"macro":0,"cc":0,"sustain":0,"dive":0},"enemyStrengths":{"teamfight":0,"waveclear":0,"macro":0,"cc":0,"sustain":0,"dive":0},"goodPicks":[{"hero":"","reason":""}],"badPicks":[{"hero":"","reason":""}],"synergies":[{"combo":"","reason":""}],"counters":[{"our":"","their":"","note":""}],"mapAdvice":"","overallAdvice":"","missingRoles":[],"winCondition":""}
+Alle tekst in het Nederlands.`;
+  try{
+    const res=await fetch('/api/analyze',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({prompt})
+    });
+    const data=await res.json();
+    if(data.error) throw new Error(JSON.stringify(data.error));
+    const raw=data.text||'';
+    showAnalysis(JSON.parse(raw.replace(/```json|```/g,'').trim()));
+  }catch(e){
+    document.getElementById('analysisPanel').innerHTML=`<div class="ap-placeholder">⚠️ Analyse mislukt.<br><small style="color:var(--muted)">${e.message}</small></div>`;
+  }
+  loading=false;btn.disabled=false;btn.innerHTML='⚡ Analyseer';
+}
+
+function showAnalysis(a){
+  const rb=(l,v,c)=>`<div class="rbar"><div class="rbar-top"><span class="rbar-name">${l}</span><span style="color:${c};font-weight:600">${v}/10</span></div><div class="rtrack"><div class="rfill" style="width:${v*10}%;background:${c}"></div></div></div>`;
+  const ts=a.teamStrengths||{},es=a.enemyStrengths||{};
+  let h='';
+  if(a.overallAdvice) h+=`<div class="a-section"><div class="a-text">${a.overallAdvice}</div></div>`;
+  if(a.winCondition) h+=`<div class="a-section"><div class="a-head" style="color:var(--gold)">🏆 Win Conditie</div><span class="chip chip-y">🎯 ${a.winCondition}</span></div>`;
+  h+=`<div class="a-section"><div class="a-head" style="color:var(--accent)">📊 Jouw Team</div>${rb('Teamfight',ts.teamfight||0,'#00b4ff')}${rb('Waveclear',ts.waveclear||0,'#00c853')}${rb('Macro',ts.macro||0,'#ffc400')}${rb('CC',ts.cc||0,'#9c27b0')}${rb('Sustain',ts.sustain||0,'#4caf50')}</div>`;
+  if(Object.keys(es).length) h+=`<div class="a-section"><div class="a-head" style="color:var(--enemy)">💀 Enemy</div>${rb('Teamfight',es.teamfight||0,'#ff3d00')}${rb('Waveclear',es.waveclear||0,'#ff3d00')}${rb('Macro',es.macro||0,'#ff3d00')}</div>`;
+  if(a.goodPicks?.length) h+=`<div class="a-section"><div class="a-head" style="color:var(--mine)">✅ Goede Picks</div>${a.goodPicks.map(p=>`<div style="margin-bottom:5px"><span class="chip chip-g">✓ ${p.hero}</span><div class="a-text" style="font-size:11px;margin-top:2px">${p.reason}</div></div>`).join('')}</div>`;
+  if(a.badPicks?.length) h+=`<div class="a-section"><div class="a-head" style="color:var(--enemy)">⚠️ Zwakke Picks</div>${a.badPicks.map(p=>`<div style="margin-bottom:5px"><span class="chip chip-r">✗ ${p.hero}</span><div class="a-text" style="font-size:11px;margin-top:2px">${p.reason}</div></div>`).join('')}</div>`;
+  if(a.synergies?.length) h+=`<div class="a-section"><div class="a-head" style="color:#ea80fc">🔗 Synergieën</div>${a.synergies.map(s=>`<div style="margin-bottom:5px"><span class="chip chip-p">⚡ ${s.combo}</span><div class="a-text" style="font-size:11px;margin-top:2px">${s.reason}</div></div>`).join('')}</div>`;
+  if(a.counters?.length) h+=`<div class="a-section"><div class="a-head" style="color:var(--gold)">⚔️ Counters</div>${a.counters.map(c=>`<div style="margin-bottom:5px"><span class="chip chip-g" style="margin:0">${c.our}</span> <span style="color:var(--muted);font-size:10px">vs</span> <span class="chip chip-r" style="margin:0">${c.their}</span><div class="a-text" style="font-size:10px;margin-top:2px">${c.note}</div></div>`).join('')}</div>`;
+  if(a.mapAdvice) h+=`<div class="a-section"><div class="a-head" style="color:var(--accent)">🗺️ Map</div><div class="a-text">${a.mapAdvice}</div></div>`;
+  if(a.missingRoles?.length) h+=`<div class="a-section"><div class="a-head" style="color:var(--gold)">🔍 Ontbreekt</div>${a.missingRoles.map(r=>`<span class="chip chip-y">! ${r}</span>`).join('')}</div>`;
+  document.getElementById('analysisPanel').innerHTML=h;
+}
+
+buildRolePills();
+renderAll();
+</script>
+</body>
+</html>
