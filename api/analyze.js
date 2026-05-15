@@ -14,35 +14,34 @@ export default async function handler(req, res) {
 
   try {
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            temperature: 0.7,
-            maxOutputTokens: 2000
-          }
+          generationConfig: { temperature: 0.7, maxOutputTokens: 2000 }
         })
       }
     );
 
     const data = await response.json();
     if (!response.ok) return res.status(response.status).json({ error: data });
+    if (!data.candidates?.length) return res.status(500).json({ error: 'Geen candidates', debug: JSON.stringify(data).slice(0,300) });
 
-    const raw = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    const raw = data.candidates[0].content.parts[0].text || '';
 
-    // Meerdere fallbacks om JSON te extraheren
     let parsed;
     try {
       parsed = JSON.parse(raw);
     } catch {
-      const match = raw.match(/\{[\s\S]*\}/);
-      if (match) {
-        parsed = JSON.parse(match[0]);
+      const start = raw.indexOf('{');
+      const end = raw.lastIndexOf('}');
+      if (start !== -1 && end > start) {
+        try { parsed = JSON.parse(raw.slice(start, end + 1)); }
+        catch { return res.status(500).json({ error: 'JSON parse mislukt', raw: raw.slice(0,500) }); }
       } else {
-        throw new Error('Geen geldige JSON in response: ' + raw.slice(0, 300));
+        return res.status(500).json({ error: 'Geen JSON gevonden', raw: raw.slice(0,500) });
       }
     }
 
